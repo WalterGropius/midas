@@ -48,8 +48,8 @@ share one intelligence layer and one live dashboard.
 | State & realtime | **SpacetimeDB** 2.10 (Maincloud) — 28 tables, 52 reducers, task-ledger DAG, graph memory |
 | UI | **Next.js 16** static export on **Vercel** — talks to SpacetimeDB directly |
 | Compute | **Modal** — always-on Node engine + scale-to-zero GPU models |
-| System 2 | **Gemini** 3.8 Flash (swarm, triage, wiki) · 3.1 Pro (supervisor, evolution, coach) · embeddings 2 |
-| System 1 | **Jev** (TypeSafe) · **Laya** (Convai, self-hosted on Modal) · Flash-Lite / heuristic fallback |
+| System 2 | **Gemini** 3.8 Flash (swarm, triage, wiki) · 3.1 Pro (supervisor, evolution, coach) · embeddings 2 — direct or via **Vercel AI Gateway** |
+| System 1 | **Jev** (TypeSafe, direct or via AI Gateway) · **Laya** (Convai, self-hosted on Modal) · Flash-Lite / heuristic fallback |
 | Forecasting | **TimesFM 2.5** on Modal (baseline + volatility band), logit-space |
 | Markets | **Polymarket** (Gamma, CLOB V2, WebSocket), Manifold (play-money sandbox), Kalshi (read-only) |
 | Connectors | HTTP control API, MCP server (Claude/agents drive MIDAS as tools), Telegram (commands + alerts), Discord/Slack/webhooks |
@@ -75,15 +75,16 @@ docs/                 ARCHITECTURE · RESEARCH · DEPLOY · research reports
 npm install
 curl -sSf https://install.spacetimedb.com | sh && spacetime start   # local DB on :3000
 npm run stdb:publish:local
-cp .env.example .env            # set GEMINI_API_KEY (and optionally TYPESAFE_API_KEY)
+cp .env.example .env            # set AI_GATEWAY_API_KEY (one key: Gemini + Jev), or GEMINI_API_KEY
 npm run seed:import -- seeds/example-macro-geopolitics
 npm run engine                  # engine + control API on :8080
 npm run web                     # UI on http://localhost:3001
 ```
 
-Without a Gemini key the engine still ingests news, streams prices, fires
-heuristic reflexes, writes graph memory and forecasts price paths — the swarm
-and supervisor stay idle.
+One `AI_GATEWAY_API_KEY` is enough: Vercel AI Gateway serves Jev, Gemini,
+embeddings and any second model family. Without any model key the engine
+still ingests news, streams prices, fires heuristic reflexes, writes graph
+memory and forecasts price paths — the swarm and supervisor stay idle.
 
 Deploying to your own Vercel + Modal + SpacetimeDB accounts:
 [docs/DEPLOY.md](docs/DEPLOY.md).

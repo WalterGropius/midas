@@ -79,7 +79,7 @@ export const deliberate: Handler = async (ctx, _task, p: { signalRef: string; en
     suffix: `WHY YOU WERE CALLED: ${p.reasons.join(', ')}\n\nARGUMENTS RAISED BY THE FAST FORECASTERS:\n${argumentsRaised}\n\nREVIEWER OBJECTIONS (severity ${critic.severity.toFixed(2)}):\n${critic.flaws.map(f => `- ${f}`).join('\n') || '- none'}`,
     schema: DELIBERATE_SCHEMA,
     thinking: 'high',
-    search: true,
+    search: { query: news.title },
     sessionId: sessions[0]?.id,
     maxOutputTokens: 8192,
   });

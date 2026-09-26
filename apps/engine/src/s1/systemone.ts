@@ -1,8 +1,10 @@
 // "System One" decision-model clients.
 //
-// Jev (TypeSafe), Jev via OpenRouter, and self-hosted Laya (`laya-serve` or the
-// MIDAS intel sidecar on Modal) all speak one wire protocol:
+// Jev (TypeSafe direct, via Vercel AI Gateway, or via OpenRouter) and
+// self-hosted Laya (`laya-serve` or the MIDAS intel sidecar on Modal) all speak
+// one wire protocol:
 //   POST {base}/v1/systemone  { state, model, questions } → { model, answers, usage }
+// (AI Gateway serves it at https://ai-gateway.vercel.sh/typesafe as `typesafe-ai/jev`.)
 // A Gemini Flash emulation and a heuristic sit underneath as fallbacks, so the
 // reflex layer always answers — just less sharply without a real S1 model.
 import {
@@ -12,9 +14,11 @@ import {
   type S1Answer,
 } from '@midas/core';
 import { config } from '../config';
+import { gatewayUrl, reportedCost } from '../llm/gateway';
 import { generateJson, geminiAvailable } from '../llm/gemini';
 import { S1_EMULATION_SCHEMA, S1_EMULATION_SYSTEM, type S1EmulationOut } from '../llm/prompts';
 import { logger } from '../log';
+import { usage } from '../llm/usage';
 import { HttpError, limiter, withTimeout } from '../util/async';
 
 const log = logger('s1');
@@ -33,6 +37,7 @@ interface WireResponse {
   model: string;
   answers: Record<string, WireAnswer>;
   usage?: { input_tokens?: number; output_tokens?: number };
+  provider_metadata?: { gateway?: { cost?: string | number } };
 }
 
 export function toWireQuestion(def: ReflexDef, instructions = def.instructions, criteriaText = def.criteriaText): WireQuestion {
@@ -94,6 +99,17 @@ function systemOneProvider(name: string, baseUrl: () => string, apiKey: () => st
       );
       if (!res.ok) throw new HttpError(`${name} ${res.status}`, res.status, (await res.text()).slice(0, 300));
       const json = (await res.json()) as WireResponse;
+      const cost = reportedCost(json);
+      if (json.usage?.input_tokens || cost !== undefined) {
+        usage.recordCost({
+          route: 's1',
+          model: `${name}:${json.model || model()}`,
+          tokensIn: json.usage?.input_tokens ?? 0,
+          tokensOut: json.usage?.output_tokens ?? 0,
+          cachedTokens: 0,
+          costUsd: cost ?? 0,
+        });
+      }
       const out: Record<string, S1Answer> = {};
       for (const id of Object.keys(questions)) out[id] = fromWire(json.answers?.[id], name);
       return out;
@@ -107,6 +123,12 @@ const jevOpenRouter = systemOneProvider(
   () => 'https://openrouter.ai/api',
   () => config.s1.openRouterKey,
   () => config.s1.openRouterJevModel
+);
+const jevGateway = systemOneProvider(
+  'jev-gateway',
+  () => (config.gateway.apiKey ? gatewayUrl('/typesafe') : ''),
+  () => config.gateway.apiKey,
+  () => config.s1.gatewayJevModel
 );
 const laya = systemOneProvider('laya', () => config.s1.layaBaseUrl, () => config.s1.layaApiKey || 'none', () => 'auto');
 
@@ -153,17 +175,15 @@ function isEmpty(a: S1Answer | undefined): boolean {
   return !num(a.noul) && a.choice === undefined && !num(a.score) && a.probs === undefined;
 }
 
-const ALL: Record<string, S1Provider> = { jev, 'jev-openrouter': jevOpenRouter, laya, flash, heuristic };
+const ALL: Record<string, S1Provider> = { jev, 'jev-gateway': jevGateway, 'jev-openrouter': jevOpenRouter, laya, flash, heuristic };
+const ORDER = ['jev', 'jev-gateway', 'jev-openrouter', 'laya', 'flash', 'heuristic'];
 
 // A provider that errors is benched for a minute so latency-critical loops
 // fall through to the next one instead of waiting on timeouts.
 const benchedUntil = new Map<string, number>();
 
 export function providerChain(preferred = config.s1.provider): S1Provider[] {
-  const order =
-    preferred === 'auto' || !ALL[preferred]
-      ? ['jev', 'jev-openrouter', 'laya', 'flash', 'heuristic']
-      : [preferred, ...['jev', 'jev-openrouter', 'laya', 'flash', 'heuristic'].filter(p => p !== preferred)];
+  const order = preferred === 'auto' || !ALL[preferred] ? ORDER : [preferred, ...ORDER.filter(p => p !== preferred)];
   return order.map(n => ALL[n]).filter(p => p.available());
 }
 

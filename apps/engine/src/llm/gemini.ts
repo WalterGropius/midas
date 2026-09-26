@@ -1,4 +1,6 @@
-// Gemini client: Flash for breadth, Pro for depth.
+// Gemini client: Flash for breadth, Pro for depth. Reached directly with
+// GEMINI_API_KEY, or through Vercel AI Gateway with AI_GATEWAY_API_KEY
+// (MIDAS_GEMINI_VIA picks; see gateway.ts).
 //
 // Prompt-caching discipline (Gemini discounts a byte-stable prefix
 // implicitly): the system instruction is a module constant, shared context
@@ -9,11 +11,14 @@ import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import { config } from '../config';
 import { logger } from '../log';
 import { limiter, retry, withTimeout } from '../util/async';
+import { gatewayAvailable, gatewayEmbed, gatewayJson, gatewayModel } from './gateway';
+import { extractJson } from './json';
 import { usage } from './usage';
 
 const log = logger('gemini');
 
 export type Tier = 'flash' | 'flashLite' | 'pro';
+export type Thinking = 'minimal' | 'low' | 'medium' | 'high';
 
 let client: GoogleGenAI | undefined;
 function ai(): GoogleGenAI {
@@ -25,8 +30,16 @@ function ai(): GoogleGenAI {
   return client;
 }
 
+/** How Gemini is reached right now, or undefined when it is not. */
+export function llmBackend(): 'direct' | 'gateway' | undefined {
+  const via = config.gemini.via;
+  if (via !== 'gateway' && config.gemini.apiKey) return 'direct';
+  if (via !== 'direct' && gatewayAvailable()) return 'gateway';
+  return undefined;
+}
+
 export function geminiAvailable(): boolean {
-  return Boolean(config.gemini.apiKey);
+  return llmBackend() !== undefined;
 }
 
 const gate = limiter(config.gemini.maxConcurrent);
@@ -47,12 +60,15 @@ export interface JsonCall {
   schema: Record<string, unknown>;
   temperature?: number;
   /** reasoning effort (Gemini 3 thinking level; 3.8 Flash / 3.1 Pro accept low|medium|high) */
-  thinking?: 'minimal' | 'low' | 'medium' | 'high';
+  thinking?: Thinking;
   maxOutputTokens?: number;
   timeoutMs?: number;
   sessionId?: bigint;
-  /** ground the answer in live Google Search results */
-  search?: boolean;
+  /**
+   * Ground the answer in live web results: Google Search when direct, the
+   * gateway's search tool (run with `query`) when via AI Gateway.
+   */
+  search?: { query: string };
 }
 
 export interface JsonResult<T> {
@@ -72,23 +88,13 @@ const THINKING: Record<string, ThinkingLevel> = {
   high: ThinkingLevel.HIGH,
 };
 
-function extractJson(text: string): unknown {
-  const trimmed = text.trim();
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    // tolerate fenced or chatty output (search-grounded calls cannot force JSON mode)
-    const m = trimmed.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-    if (!m) throw new Error(`model returned no JSON: ${trimmed.slice(0, 200)}`);
-    return JSON.parse(m[0]);
-  }
-}
-
 export class BudgetExceeded extends Error {}
 
 export async function generateJson<T>(call: JsonCall): Promise<JsonResult<T>> {
   if (usage.overGlobalBudget()) throw new BudgetExceeded(`global daily LLM budget $${config.gemini.globalDailyBudgetUsd} reached`);
   const model = modelFor(call.tier);
+  const timeoutMs = call.timeoutMs ?? (call.tier === 'pro' ? 120_000 : 45_000);
+  if (llmBackend() === 'gateway') return gatewayJson<T>({ ...call, model: gatewayModel(model), timeoutMs });
   const text = call.suffix ? `${call.prefix}\n\n${call.suffix}` : call.prefix;
   const t0 = Date.now();
   const res = await gate(() =>
@@ -110,7 +116,7 @@ export async function generateJson<T>(call: JsonCall): Promise<JsonResult<T>> {
               ...(call.thinking ? { thinkingConfig: { thinkingLevel: THINKING[call.thinking] } } : {}),
             },
           }),
-          call.timeoutMs ?? (call.tier === 'pro' ? 120_000 : 45_000),
+          timeoutMs,
           `${call.route}/${model}`
         ),
       { attempts: 3, label: call.route }
@@ -147,6 +153,10 @@ export async function embed(texts: string[], task = 'sentence similarity'): Prom
   const out: number[][] = [];
   for (let i = 0; i < texts.length; i += 64) {
     const chunk = texts.slice(i, i + 64).map(t => `task: ${task} | query: ${t.slice(0, 6000)}`);
+    if (llmBackend() === 'gateway') {
+      for (const v of await gatewayEmbed(gatewayModel(model), chunk, config.gemini.embedDims)) out.push(normalize(v));
+      continue;
+    }
     const res = await gate(() =>
       retry(
         () =>

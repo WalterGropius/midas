@@ -15,7 +15,7 @@ import type { Agent, Market, NewsItem } from '@midas/stdb-bindings/types';
 import { config } from '../config';
 import type { EngineCtx } from '../ctx';
 import { generateJson, geminiAvailable } from '../llm/gemini';
-import { altAvailable, altModels, generateJsonAlt } from '../llm/openrouter';
+import { altAvailable, altModels, generateJsonAlt } from '../llm/alt';
 import { FORECAST_SCHEMA, FORECASTER_SYSTEM, type ForecastOut } from '../llm/prompts';
 import { usage } from '../llm/usage';
 import { logger } from '../log';
@@ -106,7 +106,7 @@ export const swarm: Handler = async (ctx, _task, p: SwarmPayload) => {
   const market = ctx.hub.market(p.conditionId);
   if (!news || !market) return { result: { skipped: 'missing news or market' } };
   if (!market.active || market.resolved) return { result: { skipped: 'market inactive' } };
-  if (!geminiAvailable()) return { result: { skipped: 'no GEMINI_API_KEY' } };
+  if (!geminiAvailable()) return { result: { skipped: 'no Gemini access (GEMINI_API_KEY or AI_GATEWAY_API_KEY)' } };
 
   const sessions = sessionsForMarket(ctx, market.conditionId);
   if (sessions.length === 0) return { result: { skipped: 'no running session watches this market' } };

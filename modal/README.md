@@ -167,10 +167,12 @@ Models load in a background thread (on CPU: TimesFM about 3 s, Laya about 13 s o
 
 ```bash
 modal secret create midas-engine \
-  GEMINI_API_KEY=... \
+  AI_GATEWAY_API_KEY=... \
   MIDAS_STDB_URI=wss://maincloud.spacetimedb.com MIDAS_STDB_DB=<db> MIDAS_STDB_TOKEN=<token> \
   MIDAS_MODAL_URL=<midas-intel URL> MIDAS_MODAL_TOKEN=<intel token> \
-  TYPESAFE_API_KEY=... MIDAS_CONTROL_TOKEN=<control API token>
+  MIDAS_CONTROL_TOKEN=<control API token>
+# AI_GATEWAY_API_KEY alone covers Gemini, Jev, embeddings and alt models;
+# or use GEMINI_API_KEY (+ TYPESAFE_API_KEY for Jev) instead.
 modal deploy modal/engine_app.py
 ```
 

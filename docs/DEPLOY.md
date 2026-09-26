@@ -46,15 +46,36 @@ See `modal/README.md` for every option. In short:
 modal secret create midas-intel MIDAS_MODAL_TOKEN="$(openssl rand -hex 32)"
 modal deploy modal/midas_intel.py        # → https://<workspace>--midas-intel-api.modal.run
 
-# the engine (always-on Node container, control API on :8080)
+# the engine (always-on Node container, control API on :8080).
+# AI_GATEWAY_API_KEY alone covers Gemini, Jev, embeddings and alt models;
+# or set GEMINI_API_KEY (+ TYPESAFE_API_KEY for Jev) instead.
 modal secret create midas-engine \
   MIDAS_STDB_URI=wss://maincloud.spacetimedb.com MIDAS_STDB_DB=<your-db-name> MIDAS_STDB_TOKEN=<from step 2> \
-  GEMINI_API_KEY=<key> \
+  AI_GATEWAY_API_KEY=<key> \
   MIDAS_MODAL_URL=<intel url> MIDAS_MODAL_TOKEN=<intel token> \
   MIDAS_CONTROL_TOKEN="$(openssl rand -hex 32)" \
-  TYPESAFE_API_KEY=<optional, Jev> TELEGRAM_BOT_TOKEN=<optional> TELEGRAM_ALLOWED_CHATS=<optional>
+  TELEGRAM_BOT_TOKEN=<optional> TELEGRAM_ALLOWED_CHATS=<optional>
 modal deploy modal/engine_app.py         # → https://<workspace>--midas-engine-engine-serve.modal.run
 ```
+
+### Model access: one key through Vercel AI Gateway
+
+With only `AI_GATEWAY_API_KEY` (create it under **AI Gateway → API keys** in
+the Vercel dashboard) the engine reaches everything through
+`https://ai-gateway.vercel.sh`:
+
+| | via the gateway |
+|---|---|
+| System 1 | **Jev** as `typesafe-ai/jev` on the TypeSafe-compatible `/typesafe/v1/systemone` |
+| Swarm, triage, critic, wiki | `google/gemini-3.8-flash` · `google/gemini-3.5-flash-lite` (exact `thinkingLevel` passed through) |
+| Pro supervisor, evolution, coach | `google/gemini-3.1-pro-preview`; the supervisor gets a server-side web search tool (`MIDAS_GATEWAY_SEARCH`, default Perplexity) in place of Google Search grounding |
+| Embeddings | `google/gemini-embedding-2` at 768 dimensions |
+| Second model family | any gateway id in `MIDAS_ALT_MODELS`, e.g. `anthropic/claude-sonnet-5` |
+
+Spend and traces show up in the Vercel dashboard, and the engine records the
+gateway's billed cost per call in `llm_usage`. When `GEMINI_API_KEY` is also
+set the engine calls Gemini directly and keeps the gateway for Jev and alt
+models; `MIDAS_GEMINI_VIA=gateway` sends Gemini through the gateway anyway.
 
 Scale out ledger workers with the `worker` function described in
 `modal/README.md` (`MIDAS_ROLE=worker`); they pull from the same SpacetimeDB
@@ -127,15 +148,17 @@ exercise the live order path without real money.
 ```bash
 spacetime start                                   # local server on :3000
 npm run stdb:publish:local && npm run stdb:generate
-cp .env.example .env                              # add GEMINI_API_KEY at least
+cp .env.example .env                              # add GEMINI_API_KEY or AI_GATEWAY_API_KEY
 npm run seed:import -- seeds/example-macro-geopolitics
 npm run engine                                    # engine + control API on :8080
 npm run web                                       # UI on :3001
 MIDAS_MODAL_TOKEN=dev python modal/serve_local.py # optional: TimesFM + Laya locally
 ```
 
-No Gemini key yet? `node apps/engine/scripts/mock-gemini.mjs` serves canned,
-schema-shaped answers; start the engine with `GEMINI_API_KEY=mock
-MIDAS_GEMINI_BASE_URL=http://127.0.0.1:8799` and push a headline through
-`/api/news` to watch the whole path (triage → reflexes → swarm → Pro → decide
-→ paper fill) run. Paper sessions only.
+No keys yet? `node apps/engine/scripts/mock-gemini.mjs` serves canned,
+schema-shaped answers for both the Gemini API and the AI Gateway endpoints.
+Start the engine with `GEMINI_API_KEY=mock MIDAS_GEMINI_BASE_URL=http://127.0.0.1:8799`
+(direct) or `AI_GATEWAY_API_KEY=mock MIDAS_GATEWAY_URL=http://127.0.0.1:8799`
+(gateway), push a headline through `/api/news`, and watch the whole path
+(triage → reflexes → swarm → Pro → decide → paper fill) run;
+`curl localhost:8799/__requests` shows what the engine sent. Paper sessions only.

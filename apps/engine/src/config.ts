@@ -51,8 +51,11 @@ export const config = {
 
   gemini: {
     apiKey: str('GEMINI_API_KEY', str('GOOGLE_API_KEY')),
-    // optional: route through an AI gateway/proxy (or a local mock in tests)
+    // optional: point the native Gemini client at a proxy (or a local mock in tests)
     baseUrl: str('MIDAS_GEMINI_BASE_URL'),
+    // how Gemini is reached: 'auto' = GEMINI_API_KEY if set, else Vercel AI
+    // Gateway; 'direct' or 'gateway' force one
+    via: str('MIDAS_GEMINI_VIA', 'auto') as 'auto' | 'direct' | 'gateway',
     // Model ids move fast; override without code changes.
     flash: str('MIDAS_GEMINI_FLASH', 'gemini-3.8-flash'),
     flashLite: str('MIDAS_GEMINI_FLASH_LITE', 'gemini-3.5-flash-lite'),
@@ -68,13 +71,25 @@ export const config = {
       embed: [num('MIDAS_PRICE_EMBED_IN', 0.2), 0, 0],
     } as Record<string, [number, number, number]>,
     maxConcurrent: num('MIDAS_GEMINI_CONCURRENCY', 16),
-    // other model families (OpenRouter ids) mixed into the swarm for independent errors
+    // other model families mixed into the swarm for independent errors
+    // (AI Gateway ids like anthropic/claude-sonnet-5 when AI_GATEWAY_API_KEY
+    // is set, else OpenRouter ids)
     altModels: list('MIDAS_ALT_MODELS', []),
     globalDailyBudgetUsd: num('MIDAS_LLM_DAILY_BUDGET_USD', 25),
   },
 
+  // Vercel AI Gateway: one key reaches Jev, Gemini (when there is no
+  // GEMINI_API_KEY) and any other model family for the swarm, with spend and
+  // traces in one dashboard.
+  gateway: {
+    apiKey: str('AI_GATEWAY_API_KEY'),
+    baseUrl: str('MIDAS_GATEWAY_URL', 'https://ai-gateway.vercel.sh'),
+    // server-side web search for grounded calls: perplexity | exa | parallel | tako | none
+    search: str('MIDAS_GATEWAY_SEARCH', 'perplexity'),
+  },
+
   // System-1 decision models (Jev / Laya). 'auto' = first configured of
-  // jev → laya → flash → heuristic.
+  // jev → jev-gateway → jev-openrouter → laya → flash → heuristic.
   s1: {
     provider: str('MIDAS_S1_PROVIDER', 'auto'),
     // All three speak the same "System One" wire protocol (POST …/v1/systemone).
@@ -83,6 +98,7 @@ export const config = {
     jevModel: str('MIDAS_JEV_MODEL', 'jev-latest'),
     openRouterKey: str('OPENROUTER_API_KEY'),
     openRouterJevModel: str('MIDAS_OPENROUTER_JEV_MODEL', '~typesafe/jev-latest'),
+    gatewayJevModel: str('MIDAS_GATEWAY_JEV_MODEL', 'typesafe-ai/jev'),
     // self-hosted Laya: `laya-serve` or the MIDAS intel sidecar (defaults to MIDAS_MODAL_URL)
     layaBaseUrl: str('MIDAS_LAYA_URL', str('MIDAS_MODAL_URL')),
     layaApiKey: str('MIDAS_LAYA_API_KEY', str('MIDAS_MODAL_TOKEN')),

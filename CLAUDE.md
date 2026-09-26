@@ -73,6 +73,22 @@ target: **Vercel** (static UI) + **Modal** (engine + GPU models) +
   swarm members share one implicitly cached prefix (≥4,096 tokens to qualify on
   3.x). Watch the `[cache]` log line and the `llm_usage` table.
 
+## Vercel AI Gateway (verified 2026-09)
+
+- One `AI_GATEWAY_API_KEY`, base `https://ai-gateway.vercel.sh`. Client:
+  `apps/engine/src/llm/gateway.ts`; `MIDAS_GEMINI_VIA` picks direct vs gateway.
+- Jev: `POST /typesafe/v1/systemone`, model `typesafe-ai/jev`, TypeSafe's own
+  shapes (`noul`/`choice`/`score`), so the System-One client is reused as-is.
+- Gemini: `POST /v1/chat/completions` with `google/<id>` and
+  `response_format: json_schema`. Shared `reasoning.effort` maps low→low and
+  everything else→high on Gemini 3, so the exact level also goes in
+  `providerOptions.{google,vertex}.thinkingConfig.thinkingLevel`.
+- Google Search grounding is AI SDK-only; over REST use a gateway server tool
+  (`{type:'vercel:perplexity_search', config:{query,…}}`, snake_case config,
+  `tool_choice:'required'`). Billed cost: `provider_metadata.gateway.cost`.
+- Embeddings: `POST /v1/embeddings` with `dimensions` (mapped to Gemini's
+  `outputDimensionality`). Model list: `GET /v1/models` (no auth).
+
 ## Polymarket (verified 2026-09)
 
 - CLOB **V2** since 2026-04-28 (pUSD collateral). Use

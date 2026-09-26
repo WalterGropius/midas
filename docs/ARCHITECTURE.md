@@ -24,7 +24,7 @@ flowchart LR
     PM["Polymarket<br/>Gamma · CLOB V2 · WS"]
     RSS["RSS: Bloomberg, WSJ, Fed, …"]
     G["Gemini 3.8 Flash / 3.1 Pro"]
-    J["Jev (TypeSafe)"]
+    J["Jev (TypeSafe · AI Gateway)"]
     TG["Telegram · Discord · Slack · webhooks"]
   end
   UI <-- "WebSocket subscriptions + reducer calls" --> STDB
@@ -188,7 +188,7 @@ apps/engine/src/
   index.ts                  boot, roles, loops
   stdb.ts · config.ts       connection, env
   s1/                       System-1 clients (Jev/Laya/Flash/heuristic), reflex engine
-  llm/                      Gemini, OpenRouter alt family, prompts, usage meter
+  llm/                      Gemini (direct or AI Gateway), alt family, prompts, usage meter
   feeds/rss.ts              verified feed registry, conditional GET
   venues/                   Polymarket (+WS, CLOB V2), Manifold, Kalshi
   market/hub.ts             watched markets, live prices, 1-min bars

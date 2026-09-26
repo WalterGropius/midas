@@ -40,7 +40,7 @@ live only behind a readiness gate — with the intelligence layered on top.
 | LLMs that see the crowd do worse than a formula combining blind estimates with the crowd (Schoenegger S2) | forecasters never see the price; combination by formula | `intel/common.ts` `marketBlock`, `prompts.ts` METHOD |
 | Market is the prior: 4:1 crowd:model optimal (Halawi); fitted w=0.33 (AIA) | `modelTrust` default 0.25, blend in log-odds | `core/aggregate.ts` `blendWithMarket`, `core/risk.ts` |
 | 6–10 samples; log-odds trimmed mean/median; never an LLM aggregator | swarm K=6 default, trimmed log-odds pooling | `core/aggregate.ts`, `intel/swarm.ts` |
-| same-model errors correlate ρ≈0.7 | optional second model family via OpenRouter | `llm/openrouter.ts`, `MIDAS_ALT_MODELS` |
+| same-model errors correlate ρ≈0.7 | optional second model family via AI Gateway or OpenRouter | `llm/alt.ts`, `MIDAS_ALT_MODELS` |
 | recalibrate before fusing; slope ≈1.5 until data; clip [0.03, 0.97] | Platt calibrator per component; default slope 1.5 | `core/calibration.ts`, `learn/calibrate.ts` |
 | Pro ≫ Flash on probability (Brier 0.134 vs 0.179) | Flash for breadth/triage, Pro supervisor for contested cases (AlphaEvolve pattern) | `intel/deliberate.ts` |
 | supervisor that resolves disagreements (not a free-form aggregate); no homogeneous debate | Pro sees arguments, not a vote; searches; combined at fixed weight | `intel/deliberate.ts` |

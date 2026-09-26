@@ -79,9 +79,9 @@ class UsageMeter {
     }
   }
 
-  /** Record a call whose cost the provider reported directly (OpenRouter). */
+  /** Record a call whose cost the provider reported directly (AI Gateway, OpenRouter). */
   recordCost(
-    u: { route: string; model: string; tokensIn: number; tokensOut: number; cachedTokens: number; costUsd: number },
+    u: { route: string; model: string; tokensIn: number; tokensOut: number; cachedTokens: number; thoughtTokens?: number; costUsd: number },
     sessionId?: bigint
   ): number {
     const key = `${u.route}|${u.model}`;
@@ -90,6 +90,7 @@ class UsageMeter {
     b.tokensIn += u.tokensIn;
     b.tokensOut += u.tokensOut;
     b.cachedTokens += u.cachedTokens;
+    b.thoughtTokens += u.thoughtTokens ?? 0;
     b.costUsd += u.costUsd;
     this.buckets.set(key, b);
     this.rollDay();

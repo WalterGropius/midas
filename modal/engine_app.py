@@ -1,6 +1,6 @@
 """Modal app ``midas-engine``: the Node.js MIDAS engine (apps/engine) as an always-on service.
 
-    modal secret create midas-engine GEMINI_API_KEY=... MIDAS_STDB_URI=... MIDAS_STDB_TOKEN=... ...
+    modal secret create midas-engine AI_GATEWAY_API_KEY=... MIDAS_STDB_URI=... MIDAS_STDB_TOKEN=... ...
     modal deploy modal/engine_app.py                        # URL printed = engine control API
     MIDAS_ENGINE_WORKERS=4 modal deploy modal/engine_app.py # + 4 horizontal task workers
 

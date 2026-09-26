@@ -36,7 +36,7 @@ import { connectStdb, ensureEngineRole } from './stdb';
 import { decide } from './trade/decide';
 import { markAll } from './trade/portfolio';
 import { every } from './util/async';
-import { geminiAvailable } from './llm/gemini';
+import { geminiAvailable, llmBackend } from './llm/gemini';
 
 const log = logger('engine');
 
@@ -78,8 +78,8 @@ async function main() {
   ctxRef = ctx;
   await ctx.reflexes.ensureDefaults();
   await ensurePopulation(ctx.conn);
-  if (!geminiAvailable()) log.warn('GEMINI_API_KEY missing: swarm/Pro/wiki/evolution are idle; System-1 falls back to heuristics');
-  log.info('System-1 provider', { provider: activeProviderName() });
+  if (!geminiAvailable()) log.warn('no Gemini access (set GEMINI_API_KEY or AI_GATEWAY_API_KEY): swarm/Pro/wiki/evolution are idle');
+  log.info('providers', { gemini: llmBackend() ?? 'none', s1: activeProviderName() });
 
   const stops: (() => void)[] = [];
   const L = config.loops;
@@ -127,7 +127,7 @@ async function main() {
         info: JSON.stringify({
           role: config.role,
           s1: activeProviderName(),
-          gemini: geminiAvailable(),
+          gemini: llmBackend() ?? false,
           timesfm: Boolean(config.modal.url),
           live: config.live.enabled,
           done: worker?.completed ?? 0,
