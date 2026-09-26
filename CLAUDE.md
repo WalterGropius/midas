@@ -30,6 +30,11 @@ target: **Vercel** (static UI) + **Modal** (engine + GPU models) +
    from another model's opinion.
 6. **Replays are point-in-time.** Evolution and coaching replays must pass
    `asOfMs` to graph retrieval so candidates cannot see the future.
+7. **Read-modify-write happens inside a reducer.** The engine's cache can be
+   stale and several workers run at once, so never compute a new balance or
+   share count client-side and write it back. Fills go through `bookFill`,
+   marks through `markToMarket`; decisions are serialized per session
+   (`keyedMutex` in `trade/decide.ts`).
 
 ## SpacetimeDB 2.x (TypeScript) — verified API, do not invent others
 
@@ -40,7 +45,9 @@ target: **Vercel** (static UI) + **Modal** (engine + GPU models) +
   `bigint`. Update = spread the existing row. Index accessor = column name.
 - Client: `DbConnection.builder().withUri().withDatabaseName().withToken()`,
   `conn.reducers.fooBar({ ...object })` (object syntax, returns a Promise),
-  React: `useTable(tables.x)` returns `[rows, isLoading]`.
+  React: `useTable(tables.x)` returns `[rows, ready]` (`ready` = the
+  subscription has loaded). A reducer's promise resolves after its transaction
+  is applied to the client cache.
 - **Gotcha (SDK 2.10):** unique non-PK columns are typed as ranged indexes but
   the runtime exposes only `find`. Use `byUnique()` from
   `apps/engine/src/util/rows.ts`. Primary keys: `.find()` works.

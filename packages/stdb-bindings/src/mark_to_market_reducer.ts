@@ -11,11 +11,11 @@ import {
 } from "spacetimedb";
 
 import {
-  PositionInput,
+  SessionMarkInput,
 } from "./types";
 
 export default {
-  get positions() {
-    return __t.array(PositionInput);
+  get items() {
+    return __t.array(SessionMarkInput);
   },
 };

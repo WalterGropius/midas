@@ -118,33 +118,20 @@ export async function markAll(ctx: EngineCtx) {
       }
     }
 
-    // 3. mark to market + accounting
-    s = ctx.conn.db.session.id.find(s.id) ?? s;
+    // 3. mark to market (cash, fees and realized PnL only ever move in bookFill)
     let exposure = 0;
-    const updates = [];
-    for (const p of [...ctx.conn.db.position.sessionId.filter(s.id)].filter(p => !p.closed)) {
+    const marks = [];
+    const held = [...ctx.conn.db.position.sessionId.filter(s.id)].filter(p => !p.closed);
+    for (const p of held) {
       const mark = markFor(ctx, p) ?? p.markPrice;
       exposure += p.shares * mark;
-      updates.push({ ...p, markPrice: mark, unrealizedPnlUsd: p.shares * (mark - p.avgPrice) });
+      marks.push({ positionId: p.id, markPrice: mark });
     }
-    if (updates.length > 0) await ctx.conn.reducers.upsertPositions({ positions: updates });
+    await ctx.conn.reducers.markToMarket({ items: [{ sessionId: s.id, marks, resetDayStart: newDay }] });
+    s = ctx.conn.db.session.id.find(s.id) ?? s;
     const equity = s.cashUsd + exposure;
     const peak = Math.max(s.peakEquityUsd, equity);
     const dayStart = newDay ? equity : s.dayStartEquityUsd;
-    await ctx.conn.reducers.updateSessionAccounting({
-      items: [
-        {
-          sessionId: s.id,
-          cashUsd: s.cashUsd,
-          equityUsd: equity,
-          peakEquityUsd: peak,
-          dayStartEquityUsd: dayStart,
-          realizedPnlUsd: s.realizedPnlUsd,
-          feesPaidUsd: s.feesPaidUsd,
-          exposureUsd: exposure,
-        },
-      ],
-    });
 
     // 4. circuit breakers
     if (s.status === 'running') {
@@ -155,7 +142,7 @@ export async function markAll(ctx: EngineCtx) {
           peakEquityUsd: peak,
           dayStartEquityUsd: dayStart,
           exposureUsd: exposure,
-          openPositions: updates.length,
+          openPositions: held.length,
           exposureInMarketUsd: 0,
         },
         s.risk as RiskLimits

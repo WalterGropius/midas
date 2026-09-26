@@ -3,6 +3,7 @@ import { parseFeed, resolveFeed } from '../src/feeds/rss';
 import { fromGamma, roundToTick } from '../src/venues/polymarket';
 import { toWireQuestion } from '../src/s1/systemone';
 import { DEFAULT_REFLEXES } from '@midas/core';
+import { keyedMutex, sleep } from '../src/util/async';
 
 describe('RSS/Atom parsing', () => {
   it('parses RSS 2.0 with CDATA and HTML', () => {
@@ -85,5 +86,29 @@ describe('System-One wire protocol', () => {
     const urg = toWireQuestion(DEFAULT_REFLEXES.find(r => r.key === 'news.urgency')!);
     expect(urg.type).toBe('score');
     expect((urg as { criteria: string[] }).criteria).toHaveLength(4);
+  });
+});
+
+describe('keyedMutex', () => {
+  it('serializes one key, runs other keys in parallel, and survives failures', async () => {
+    const lock = keyedMutex();
+    const log: string[] = [];
+    const job = (key: string, name: string, ms: number, fail = false) =>
+      lock(key, async () => {
+        log.push(`${name}+`);
+        await sleep(ms);
+        log.push(`${name}-`);
+        if (fail) throw new Error(name);
+        return name;
+      });
+    const a1 = job('s1', 'a1', 30, true);
+    const a2 = job('s1', 'a2', 5);
+    const b1 = job('s2', 'b1', 10);
+    await expect(a1).rejects.toThrow('a1');
+    expect(await a2).toBe('a2');
+    expect(await b1).toBe('b1');
+    // b1 ran while a1 held s1; a2 waited for a1 even though a1 failed
+    expect(log.indexOf('b1+')).toBeLessThan(log.indexOf('a1-'));
+    expect(log.indexOf('a2+')).toBeGreaterThan(log.indexOf('a1-'));
   });
 });

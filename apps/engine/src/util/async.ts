@@ -35,6 +35,21 @@ export function limiter(concurrency: number) {
 
 export type Limiter = ReturnType<typeof limiter>;
 
+/** Runs callbacks sharing a key one at a time (e.g. one decision per session). */
+export function keyedMutex() {
+  const tails = new Map<string, Promise<unknown>>();
+  return function lock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const prev = tails.get(key) ?? Promise.resolve();
+    const run = prev.then(fn, fn);
+    const tail = run.catch(() => undefined);
+    tails.set(key, tail);
+    void tail.then(() => {
+      if (tails.get(key) === tail) tails.delete(key);
+    });
+    return run;
+  };
+}
+
 export const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
 export class HttpError extends Error {

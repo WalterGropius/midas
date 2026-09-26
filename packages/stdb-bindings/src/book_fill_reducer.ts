@@ -11,11 +11,11 @@ import {
 } from "spacetimedb";
 
 import {
-  SessionAccountingInput,
+  FillInput,
 } from "./types";
 
 export default {
-  get items() {
-    return __t.array(SessionAccountingInput);
+  get fill() {
+    return FillInput;
   },
 };

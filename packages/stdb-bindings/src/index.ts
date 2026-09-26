@@ -37,6 +37,7 @@ import {
 import AddCalibrationSamplesReducer from "./add_calibration_samples_reducer";
 import AddSessionMarketReducer from "./add_session_market_reducer";
 import ApproveLiveReducer from "./approve_live_reducer";
+import BookFillReducer from "./book_fill_reducer";
 import CancelTasksReducer from "./cancel_tasks_reducer";
 import ClaimOperatorReducer from "./claim_operator_reducer";
 import ClaimTasksReducer from "./claim_tasks_reducer";
@@ -53,6 +54,7 @@ import InsertPriceBarsReducer from "./insert_price_bars_reducer";
 import InsertSignalReducer from "./insert_signal_reducer";
 import InvalidateMemEdgesReducer from "./invalidate_mem_edges_reducer";
 import LogActivitiesReducer from "./log_activities_reducer";
+import MarkToMarketReducer from "./mark_to_market_reducer";
 import MergeMemNodesReducer from "./merge_mem_nodes_reducer";
 import RecordDecisionReducer from "./record_decision_reducer";
 import RecordEquityReducer from "./record_equity_reducer";
@@ -71,7 +73,6 @@ import SetSessionModeReducer from "./set_session_mode_reducer";
 import SetSessionStatusReducer from "./set_session_status_reducer";
 import UnmergeMemNodeReducer from "./unmerge_mem_node_reducer";
 import UpdateNewsTriageReducer from "./update_news_triage_reducer";
-import UpdateSessionAccountingReducer from "./update_session_accounting_reducer";
 import UpdateSessionConfigReducer from "./update_session_config_reducer";
 import UpsertAgentsReducer from "./upsert_agents_reducer";
 import UpsertCalibratorReducer from "./upsert_calibrator_reducer";
@@ -79,7 +80,6 @@ import UpsertMarketsReducer from "./upsert_markets_reducer";
 import UpsertMemEdgesReducer from "./upsert_mem_edges_reducer";
 import UpsertMemNodesReducer from "./upsert_mem_nodes_reducer";
 import UpsertOrdersReducer from "./upsert_orders_reducer";
-import UpsertPositionsReducer from "./upsert_positions_reducer";
 import UpsertReflexesReducer from "./upsert_reflexes_reducer";
 import UpsertSeedFileReducer from "./upsert_seed_file_reducer";
 
@@ -516,6 +516,7 @@ const reducersSchema = __reducers(
   __reducerSchema("add_calibration_samples", AddCalibrationSamplesReducer),
   __reducerSchema("add_session_market", AddSessionMarketReducer),
   __reducerSchema("approve_live", ApproveLiveReducer),
+  __reducerSchema("book_fill", BookFillReducer),
   __reducerSchema("cancel_tasks", CancelTasksReducer),
   __reducerSchema("claim_operator", ClaimOperatorReducer),
   __reducerSchema("claim_tasks", ClaimTasksReducer),
@@ -532,6 +533,7 @@ const reducersSchema = __reducers(
   __reducerSchema("insert_signal", InsertSignalReducer),
   __reducerSchema("invalidate_mem_edges", InvalidateMemEdgesReducer),
   __reducerSchema("log_activities", LogActivitiesReducer),
+  __reducerSchema("mark_to_market", MarkToMarketReducer),
   __reducerSchema("merge_mem_nodes", MergeMemNodesReducer),
   __reducerSchema("record_decision", RecordDecisionReducer),
   __reducerSchema("record_equity", RecordEquityReducer),
@@ -550,7 +552,6 @@ const reducersSchema = __reducers(
   __reducerSchema("set_session_status", SetSessionStatusReducer),
   __reducerSchema("unmerge_mem_node", UnmergeMemNodeReducer),
   __reducerSchema("update_news_triage", UpdateNewsTriageReducer),
-  __reducerSchema("update_session_accounting", UpdateSessionAccountingReducer),
   __reducerSchema("update_session_config", UpdateSessionConfigReducer),
   __reducerSchema("upsert_agents", UpsertAgentsReducer),
   __reducerSchema("upsert_calibrator", UpsertCalibratorReducer),
@@ -558,7 +559,6 @@ const reducersSchema = __reducers(
   __reducerSchema("upsert_mem_edges", UpsertMemEdgesReducer),
   __reducerSchema("upsert_mem_nodes", UpsertMemNodesReducer),
   __reducerSchema("upsert_orders", UpsertOrdersReducer),
-  __reducerSchema("upsert_positions", UpsertPositionsReducer),
   __reducerSchema("upsert_reflexes", UpsertReflexesReducer),
   __reducerSchema("upsert_seed_file", UpsertSeedFileReducer),
 );

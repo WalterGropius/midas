@@ -278,6 +278,21 @@ export const EvolutionTrial = __t.object("EvolutionTrial", {
 });
 export type EvolutionTrial = __Infer<typeof EvolutionTrial>;
 
+export const FillInput = __t.object("FillInput", {
+  sessionId: __t.u64(),
+  conditionId: __t.string(),
+  outcome: __t.string(),
+  side: __t.string(),
+  shares: __t.f64(),
+  price: __t.f64(),
+  fee: __t.f64(),
+  strategy: __t.string(),
+  targetPrice: __t.f64(),
+  stopPrice: __t.f64(),
+  timeStopMicros: __t.i64(),
+});
+export type FillInput = __Infer<typeof FillInput>;
+
 export const GlobalFlag = __t.object("GlobalFlag", {
   key: __t.string(),
   value: __t.string(),
@@ -581,23 +596,11 @@ export const Position = __t.object("Position", {
 });
 export type Position = __Infer<typeof Position>;
 
-export const PositionInput = __t.object("PositionInput", {
-  sessionId: __t.u64(),
-  conditionId: __t.string(),
-  outcome: __t.string(),
-  shares: __t.f64(),
-  avgPrice: __t.f64(),
-  costUsd: __t.f64(),
+export const PositionMarkInput = __t.object("PositionMarkInput", {
+  positionId: __t.u64(),
   markPrice: __t.f64(),
-  unrealizedPnlUsd: __t.f64(),
-  realizedPnlUsd: __t.f64(),
-  closed: __t.bool(),
-  strategy: __t.string(),
-  targetPrice: __t.f64(),
-  stopPrice: __t.f64(),
-  timeStopMicros: __t.i64(),
 });
-export type PositionInput = __Infer<typeof PositionInput>;
+export type PositionMarkInput = __Infer<typeof PositionMarkInput>;
 
 export const PriceBar = __t.object("PriceBar", {
   id: __t.u64(),
@@ -734,17 +737,14 @@ export const Session = __t.object("Session", {
 });
 export type Session = __Infer<typeof Session>;
 
-export const SessionAccountingInput = __t.object("SessionAccountingInput", {
+export const SessionMarkInput = __t.object("SessionMarkInput", {
   sessionId: __t.u64(),
-  cashUsd: __t.f64(),
-  equityUsd: __t.f64(),
-  peakEquityUsd: __t.f64(),
-  dayStartEquityUsd: __t.f64(),
-  realizedPnlUsd: __t.f64(),
-  feesPaidUsd: __t.f64(),
-  exposureUsd: __t.f64(),
+  get marks() {
+    return __t.array(PositionMarkInput);
+  },
+  resetDayStart: __t.bool(),
 });
-export type SessionAccountingInput = __Infer<typeof SessionAccountingInput>;
+export type SessionMarkInput = __Infer<typeof SessionMarkInput>;
 
 export const SessionMarket = __t.object("SessionMarket", {
   id: __t.u64(),

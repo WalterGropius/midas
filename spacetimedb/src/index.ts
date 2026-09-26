@@ -22,13 +22,13 @@ import spacetimedb, {
   NewsTriageInput,
   OrderInput,
   PathForecastInput,
-  PositionInput,
+  FillInput,
+  SessionMarkInput,
   PriceBarInput,
   ReflexInput,
   ReflexStatsInput,
   RiskConfig,
   SeedFileInput,
-  SessionAccountingInput,
   SessionMarketInput,
   SignalInput,
   SignalScoreInput,
@@ -566,27 +566,34 @@ export const deleteSeedFile = spacetimedb.reducer({ id: t.u64() }, (ctx, { id })
   ctx.db.seedFile.id.delete(id);
 });
 
-export const updateSessionAccounting = spacetimedb.reducer(
-  { items: t.array(SessionAccountingInput) },
-  (ctx, { items }) => {
-    requireEngine(ctx);
-    for (const a of items) {
-      const s = ctx.db.session.id.find(a.sessionId);
-      if (!s) continue;
-      ctx.db.session.id.update({
-        ...s,
-        cashUsd: a.cashUsd,
-        equityUsd: a.equityUsd,
-        peakEquityUsd: a.peakEquityUsd,
-        dayStartEquityUsd: a.dayStartEquityUsd,
-        realizedPnlUsd: a.realizedPnlUsd,
-        feesPaidUsd: a.feesPaidUsd,
-        exposureUsd: a.exposureUsd,
-        updatedAt: ctx.timestamp,
-      });
+/** Marks open positions and derives exposure/equity/peak in one transaction. */
+export const markToMarket = spacetimedb.reducer({ items: t.array(SessionMarkInput) }, (ctx, { items }) => {
+  requireEngine(ctx);
+  for (const it of items) {
+    const s = ctx.db.session.id.find(it.sessionId);
+    if (!s) continue;
+    const marks = new Map<bigint, number>();
+    for (const m of it.marks) if (Number.isFinite(m.markPrice)) marks.set(m.positionId, clamp(m.markPrice, 0, 1));
+    let exposure = 0;
+    for (const p of [...ctx.db.position.sessionId.filter(s.id)]) {
+      if (p.closed) continue;
+      const mark = marks.get(p.id);
+      if (mark !== undefined) {
+        ctx.db.position.id.update({ ...p, markPrice: mark, unrealizedPnlUsd: p.shares * (mark - p.avgPrice), updatedAt: ctx.timestamp });
+      }
+      exposure += p.shares * (mark ?? p.markPrice);
     }
+    const equity = s.cashUsd + exposure;
+    ctx.db.session.id.update({
+      ...s,
+      equityUsd: equity,
+      exposureUsd: exposure,
+      peakEquityUsd: Math.max(s.peakEquityUsd, equity),
+      dayStartEquityUsd: it.resetDayStart ? equity : s.dayStartEquityUsd,
+      updatedAt: ctx.timestamp,
+    });
   }
-);
+});
 
 export const recordEquity = spacetimedb.reducer({ points: t.array(EquityPointInput) }, (ctx, { points }) => {
   requireEngine(ctx);
@@ -772,22 +779,98 @@ export const upsertOrders = spacetimedb.reducer({ orders: t.array(OrderInput) },
   }
 });
 
-export const upsertPositions = spacetimedb.reducer({ positions: t.array(PositionInput) }, (ctx, { positions }) => {
-  requireEngine(ctx);
-  for (const p of positions) {
-    let open: (typeof ctx.db.position extends { iter(): Iterable<infer R> } ? R : never) | undefined;
-    for (const row of ctx.db.position.sessionId.filter(p.sessionId)) {
-      if (!row.closed && row.conditionId === p.conditionId && row.outcome === p.outcome) {
-        open = row;
-        break;
-      }
-    }
-    if (open) {
-      ctx.db.position.id.update({ ...open, ...p, id: open.id, openedAt: open.openedAt, updatedAt: ctx.timestamp });
-    } else if (!p.closed) {
-      ctx.db.position.insert({ id: 0n, ...p, openedAt: ctx.timestamp, updatedAt: ctx.timestamp });
-    }
+function openPositionRow(ctx: Ctx, sessionId: bigint, conditionId: string, outcome: string) {
+  for (const row of ctx.db.position.sessionId.filter(sessionId)) {
+    if (!row.closed && row.conditionId === conditionId && row.outcome === outcome) return row;
   }
+  return undefined;
+}
+
+/**
+ * Books one fill against the open position and the session's cash in a single
+ * transaction, so concurrent workers can never lose each other's updates.
+ */
+export const bookFill = spacetimedb.reducer({ fill: FillInput }, (ctx, { fill: f }) => {
+  requireEngine(ctx);
+  if (f.side !== 'BUY' && f.side !== 'SELL') throw new SenderError(`bad side ${f.side}`);
+  if (!(f.shares > 0) || !(f.price >= 0 && f.price <= 1) || !(f.fee >= 0)) throw new SenderError('bad fill');
+  const s = requireSession(ctx, f.sessionId);
+  const pos = openPositionRow(ctx, f.sessionId, f.conditionId, f.outcome);
+  let cash = s.cashUsd;
+  let realized = s.realizedPnlUsd;
+  if (f.side === 'BUY') {
+    const shares = (pos?.shares ?? 0) + f.shares;
+    const avgPrice = ((pos ? pos.shares * pos.avgPrice : 0) + f.shares * f.price) / shares;
+    const costUsd = (pos?.costUsd ?? 0) + f.shares * f.price + f.fee;
+    cash -= f.shares * f.price + f.fee;
+    const plan = f.strategy
+      ? { strategy: f.strategy, targetPrice: f.targetPrice, stopPrice: f.stopPrice, timeStopMicros: f.timeStopMicros }
+      : {};
+    if (pos) {
+      ctx.db.position.id.update({
+        ...pos,
+        ...plan,
+        shares,
+        avgPrice,
+        costUsd,
+        markPrice: f.price,
+        unrealizedPnlUsd: shares * (f.price - avgPrice),
+        updatedAt: ctx.timestamp,
+      });
+    } else {
+      ctx.db.position.insert({
+        id: 0n,
+        sessionId: f.sessionId,
+        conditionId: f.conditionId,
+        outcome: f.outcome,
+        shares,
+        avgPrice,
+        costUsd,
+        markPrice: f.price,
+        unrealizedPnlUsd: 0,
+        realizedPnlUsd: 0,
+        closed: false,
+        strategy: f.strategy || 'value',
+        targetPrice: f.targetPrice,
+        stopPrice: f.stopPrice,
+        timeStopMicros: f.timeStopMicros,
+        openedAt: ctx.timestamp,
+        updatedAt: ctx.timestamp,
+      });
+    }
+  } else {
+    if (!pos) return;
+    const sold = Math.min(pos.shares, f.shares);
+    const proceeds = sold * f.price - f.fee;
+    const pnl = proceeds - sold * pos.avgPrice;
+    const left = pos.shares - sold;
+    const closed = left <= 1e-6;
+    cash += proceeds;
+    realized += pnl;
+    ctx.db.position.id.update({
+      ...pos,
+      shares: closed ? 0 : left,
+      costUsd: closed ? 0 : left * pos.avgPrice,
+      markPrice: f.price,
+      unrealizedPnlUsd: closed ? 0 : left * (f.price - pos.avgPrice),
+      realizedPnlUsd: pos.realizedPnlUsd + pnl,
+      closed,
+      updatedAt: ctx.timestamp,
+    });
+  }
+  let exposure = 0;
+  for (const p of ctx.db.position.sessionId.filter(s.id)) if (!p.closed) exposure += p.shares * p.markPrice;
+  const equity = cash + exposure;
+  ctx.db.session.id.update({
+    ...s,
+    cashUsd: cash,
+    realizedPnlUsd: realized,
+    feesPaidUsd: s.feesPaidUsd + f.fee,
+    exposureUsd: exposure,
+    equityUsd: equity,
+    peakEquityUsd: Math.max(s.peakEquityUsd, equity),
+    updatedAt: ctx.timestamp,
+  });
 });
 
 // ───────────────────────────── agents & evolution ─────────────────────────────

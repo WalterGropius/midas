@@ -51,6 +51,8 @@ export const config = {
 
   gemini: {
     apiKey: str('GEMINI_API_KEY', str('GOOGLE_API_KEY')),
+    // optional: route through an AI gateway/proxy (or a local mock in tests)
+    baseUrl: str('MIDAS_GEMINI_BASE_URL'),
     // Model ids move fast; override without code changes.
     flash: str('MIDAS_GEMINI_FLASH', 'gemini-3.8-flash'),
     flashLite: str('MIDAS_GEMINI_FLASH_LITE', 'gemini-3.5-flash-lite'),

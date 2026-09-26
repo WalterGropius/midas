@@ -18,7 +18,10 @@ export type Tier = 'flash' | 'flashLite' | 'pro';
 let client: GoogleGenAI | undefined;
 function ai(): GoogleGenAI {
   if (!config.gemini.apiKey) throw new Error('GEMINI_API_KEY is not set');
-  client ??= new GoogleGenAI({ apiKey: config.gemini.apiKey });
+  client ??= new GoogleGenAI({
+    apiKey: config.gemini.apiKey,
+    ...(config.gemini.baseUrl ? { httpOptions: { baseUrl: config.gemini.baseUrl } } : {}),
+  });
   return client;
 }
 

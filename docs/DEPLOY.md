@@ -133,3 +133,9 @@ npm run engine                                    # engine + control API on :808
 npm run web                                       # UI on :3001
 MIDAS_MODAL_TOKEN=dev python modal/serve_local.py # optional: TimesFM + Laya locally
 ```
+
+No Gemini key yet? `node apps/engine/scripts/mock-gemini.mjs` serves canned,
+schema-shaped answers; start the engine with `GEMINI_API_KEY=mock
+MIDAS_GEMINI_BASE_URL=http://127.0.0.1:8799` and push a headline through
+`/api/news` to watch the whole path (triage → reflexes → swarm → Pro → decide
+→ paper fill) run. Paper sessions only.

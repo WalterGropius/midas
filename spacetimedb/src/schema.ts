@@ -212,17 +212,17 @@ export const OrderInput = t.object('OrderInput', {
   note: t.string(),
 });
 
-export const PositionInput = t.object('PositionInput', {
+// One fill, booked atomically against position + session cash (bookFill).
+export const FillInput = t.object('FillInput', {
   sessionId: t.u64(),
   conditionId: t.string(),
   outcome: t.string(),
+  // BUY | SELL
+  side: t.string(),
   shares: t.f64(),
-  avgPrice: t.f64(),
-  costUsd: t.f64(),
-  markPrice: t.f64(),
-  unrealizedPnlUsd: t.f64(),
-  realizedPnlUsd: t.f64(),
-  closed: t.bool(),
+  price: t.f64(),
+  fee: t.f64(),
+  // exit plan for a BUY; empty strategy keeps the position's current plan
   strategy: t.string(),
   targetPrice: t.f64(),
   stopPrice: t.f64(),
@@ -230,15 +230,16 @@ export const PositionInput = t.object('PositionInput', {
   timeStopMicros: t.i64(),
 });
 
-export const SessionAccountingInput = t.object('SessionAccountingInput', {
+export const PositionMarkInput = t.object('PositionMarkInput', {
+  positionId: t.u64(),
+  markPrice: t.f64(),
+});
+
+// Mark-derived fields only; cash, fees and realized PnL move only via bookFill.
+export const SessionMarkInput = t.object('SessionMarkInput', {
   sessionId: t.u64(),
-  cashUsd: t.f64(),
-  equityUsd: t.f64(),
-  peakEquityUsd: t.f64(),
-  dayStartEquityUsd: t.f64(),
-  realizedPnlUsd: t.f64(),
-  feesPaidUsd: t.f64(),
-  exposureUsd: t.f64(),
+  marks: t.array(PositionMarkInput),
+  resetDayStart: t.bool(),
 });
 
 export const EquityPointInput = t.object('EquityPointInput', {

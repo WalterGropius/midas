@@ -30,6 +30,7 @@ import { msFromTs, ref } from '../util/time';
 import type { Handler } from '../ledger/types';
 import { execute, liveBlock, openPosition, takerFee, type ExitPlan } from './executor';
 import { byUnique } from '../util/rows';
+import { keyedMutex } from '../util/async';
 
 const log = logger('decide');
 
@@ -166,7 +167,15 @@ function candidates(ctx: EngineCtx, s: Session, m: Market, signal: Signal, mode:
   return out;
 }
 
-export const decide: Handler = async (ctx, _task, p: { signalRef: string; sessionId: string; mode: 'reflex' | 'signal' }) => {
+// Sizing reads the session's cash and exposure, so decisions for one session
+// run one at a time: each sees the fills booked by the one before it.
+const sessionLock = keyedMutex();
+
+type DecidePayload = { signalRef: string; sessionId: string; mode: 'reflex' | 'signal' };
+
+export const decide: Handler = (ctx, task, p: DecidePayload) => sessionLock(p.sessionId, () => decideLocked(ctx, task, p));
+
+const decideLocked: Handler = async (ctx, _task, p: DecidePayload) => {
   const signal = byUnique(ctx.conn.db.signal.ref, p.signalRef);
   const s = ctx.conn.db.session.id.find(BigInt(p.sessionId));
   if (!signal || !s) return { result: { skipped: 'signal or session missing' } };

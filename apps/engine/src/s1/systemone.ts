@@ -147,6 +147,12 @@ const heuristic: S1Provider = {
   },
 };
 
+function isEmpty(a: S1Answer | undefined): boolean {
+  if (!a) return true;
+  const num = (x: number | undefined) => x !== undefined && Number.isFinite(x);
+  return !num(a.noul) && a.choice === undefined && !num(a.score) && a.probs === undefined;
+}
+
 const ALL: Record<string, S1Provider> = { jev, 'jev-openrouter': jevOpenRouter, laya, flash, heuristic };
 
 // A provider that errors is benched for a minute so latency-critical loops
@@ -168,6 +174,13 @@ export async function decide(req: S1Request, preferred?: string): Promise<{ answ
     if ((benchedUntil.get(p.name) ?? 0) > Date.now()) continue;
     try {
       const answers = await p.decide(req);
+      // A provider that skips a question must not read as a coin flip (0.5
+      // clears several firing thresholds): fill the gaps from the heuristic.
+      const missing = Object.keys(req.questions).filter(id => isEmpty(answers[id]));
+      if (missing.length > 0 && p.name !== 'heuristic') {
+        const fill = await heuristic.decide({ ...req, questions: Object.fromEntries(missing.map(id => [id, req.questions[id]])) });
+        Object.assign(answers, fill);
+      }
       const latencyMs = Date.now() - t0;
       for (const a of Object.values(answers)) a.latencyMs = latencyMs;
       return { answers, latencyMs };

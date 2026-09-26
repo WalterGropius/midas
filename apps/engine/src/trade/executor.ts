@@ -166,72 +166,26 @@ export async function execute(ctx: EngineCtx, req: OrderRequest): Promise<FillRe
   return fill;
 }
 
-/** Apply a fill to position + session cash (the same ledger for paper and live). */
+/**
+ * Apply a fill to position + session cash (the same ledger for paper and live).
+ * The arithmetic runs inside the `bookFill` reducer so concurrent workers
+ * cannot overwrite each other's cash or share counts.
+ */
 export async function book(ctx: EngineCtx, req: Pick<OrderRequest, 'session' | 'market' | 'outcome' | 'side' | 'plan'>, fill: { filled: number; avgPrice: number; fee: number }) {
-  const s = ctx.conn.db.session.id.find(req.session.id) ?? req.session;
-  const pos = openPosition(ctx, s.id, req.market.conditionId, req.outcome);
-  let cash = s.cashUsd;
-  let realized = s.realizedPnlUsd;
-  const fees = s.feesPaidUsd + fill.fee;
-  if (req.side === 'BUY') {
-    const shares = (pos?.shares ?? 0) + fill.filled;
-    const cost = (pos?.costUsd ?? 0) + fill.filled * fill.avgPrice + fill.fee;
-    const avgPrice = (((pos?.shares ?? 0) * (pos?.avgPrice ?? 0)) + fill.filled * fill.avgPrice) / shares;
-    cash -= fill.filled * fill.avgPrice + fill.fee;
-    await ctx.conn.reducers.upsertPositions({
-      positions: [
-        {
-          sessionId: s.id,
-          conditionId: req.market.conditionId,
-          outcome: req.outcome,
-          shares,
-          avgPrice,
-          costUsd: cost,
-          markPrice: fill.avgPrice,
-          unrealizedPnlUsd: 0,
-          realizedPnlUsd: pos?.realizedPnlUsd ?? 0,
-          closed: false,
-          strategy: req.plan?.strategy ?? pos?.strategy ?? 'value',
-          targetPrice: req.plan?.targetPrice ?? pos?.targetPrice ?? 0,
-          stopPrice: req.plan?.stopPrice ?? pos?.stopPrice ?? 0,
-          timeStopMicros: BigInt(Math.round(req.plan?.timeStopMs ?? 0)) * 1000n || pos?.timeStopMicros || 0n,
-        },
-      ],
-    });
-  } else if (pos) {
-    const sold = Math.min(pos.shares, fill.filled);
-    const proceeds = sold * fill.avgPrice - fill.fee;
-    const pnl = proceeds - sold * pos.avgPrice;
-    const shares = pos.shares - sold;
-    cash += proceeds;
-    realized += pnl;
-    await ctx.conn.reducers.upsertPositions({
-      positions: [
-        {
-          ...pos,
-          shares,
-          costUsd: shares * pos.avgPrice,
-          markPrice: fill.avgPrice,
-          unrealizedPnlUsd: 0,
-          realizedPnlUsd: pos.realizedPnlUsd + pnl,
-          closed: shares <= 1e-6,
-        },
-      ],
-    });
-  }
-  await ctx.conn.reducers.updateSessionAccounting({
-    items: [
-      {
-        sessionId: s.id,
-        cashUsd: cash,
-        equityUsd: s.equityUsd + (cash - s.cashUsd) + (req.side === 'BUY' ? fill.filled * fill.avgPrice : -fill.filled * fill.avgPrice),
-        peakEquityUsd: s.peakEquityUsd,
-        dayStartEquityUsd: s.dayStartEquityUsd,
-        realizedPnlUsd: realized,
-        feesPaidUsd: fees,
-        exposureUsd: s.exposureUsd,
-      },
-    ],
+  await ctx.conn.reducers.bookFill({
+    fill: {
+      sessionId: req.session.id,
+      conditionId: req.market.conditionId,
+      outcome: req.outcome,
+      side: req.side,
+      shares: fill.filled,
+      price: fill.avgPrice,
+      fee: fill.fee,
+      strategy: req.plan?.strategy ?? '',
+      targetPrice: req.plan?.targetPrice ?? 0,
+      stopPrice: req.plan?.stopPrice ?? 0,
+      timeStopMicros: BigInt(Math.round(req.plan?.timeStopMs ?? 0)) * 1000n,
+    },
   });
 }
 
