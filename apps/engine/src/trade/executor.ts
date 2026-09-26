@@ -55,6 +55,9 @@ export function openPosition(ctx: EngineCtx, sessionId: bigint, conditionId: str
 /** Is live trading allowed for this session right now? Returns the blocking reason. */
 export function liveBlock(ctx: EngineCtx, s: Session): string | undefined {
   if (!config.live.enabled) return 'MIDAS_LIVE_TRADING is off';
+  if (!config.live.privateKey) return 'POLYMARKET_PRIVATE_KEY is not set';
+  // proxy, safe and deposit wallets (signature types 1–3) trade from the funder address
+  if (config.live.signatureType !== 0 && !config.live.funder) return `POLYMARKET_FUNDER is not set (required for signature type ${config.live.signatureType})`;
   if (!s.liveApproved) return 'session not approved for live trading';
   if (s.bankrollUsd > config.live.maxSessionBankrollUsd) return `bankroll above MIDAS_LIVE_MAX_BANKROLL_USD (${config.live.maxSessionBankrollUsd})`;
   if (config.live.requireReadiness) {

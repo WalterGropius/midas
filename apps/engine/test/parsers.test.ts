@@ -112,3 +112,22 @@ describe('keyedMutex', () => {
     expect(log.indexOf('a2+')).toBeGreaterThan(log.indexOf('a1-'));
   });
 });
+
+describe('live gate', () => {
+  it('names the missing wallet setting before anything reaches the venue', async () => {
+    const { config } = await import('../src/config');
+    const { liveBlock } = await import('../src/trade/executor');
+    const saved = { ...config.live };
+    const s = { liveApproved: true, bankrollUsd: 100 } as never;
+    try {
+      Object.assign(config.live, { enabled: true, privateKey: '', funder: '', signatureType: 3, requireReadiness: false });
+      expect(liveBlock({} as never, s)).toBe('POLYMARKET_PRIVATE_KEY is not set');
+      config.live.privateKey = '0xabc';
+      expect(liveBlock({} as never, s)).toMatch(/^POLYMARKET_FUNDER is not set/);
+      config.live.signatureType = 0;
+      expect(liveBlock({} as never, s)).toBeUndefined();
+    } finally {
+      Object.assign(config.live, saved);
+    }
+  });
+});
