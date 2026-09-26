@@ -1,0 +1,2 @@
+# midas
+ai money generator
