@@ -180,6 +180,8 @@ export const config = {
     // reflex quick-trade: act on System 1 before deliberation finishes
     reflexTrades: bool('MIDAS_REFLEX_TRADES', true),
     reflexStakeFrac: num('MIDAS_REFLEX_STAKE_FRAC', 0.25),
+    // one swarm call first so the others hit Gemini's implicit prefix cache
+    warmCacheFirst: bool('MIDAS_SWARM_WARM_CACHE', true),
   },
 };
 

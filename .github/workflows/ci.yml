@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  typescript:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck (module, core, engine, web)
+        run: npm run typecheck
+      - name: Unit tests (core math + engine parsers)
+        run: npm test
+      - name: Build static UI
+        run: npm run build
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install numpy pytest
+      - run: python -m py_compile modal/*.py
+      - run: python -m pytest modal/test_core_math.py -q

@@ -128,8 +128,7 @@ export const swarm: Handler = async (ctx, _task, p: SwarmPayload) => {
   const usageSum = new UsageSum();
   // every other agent runs on another model family when one is configured
   const alts = altAvailable() ? altModels() : [];
-  const answers = await Promise.all(
-    agents.map(async (a, i) => {
+  const ask = async (a: Agent, i: number) => {
       const t0 = Date.now();
       try {
         const alt = alts.length > 0 && i % 2 === 1 ? alts[Math.floor(i / 2) % alts.length] : undefined;
@@ -159,8 +158,12 @@ export const swarm: Handler = async (ctx, _task, p: SwarmPayload) => {
         log.warn('forecaster failed', { agent: a.name, err: String(err) });
         return undefined;
       }
-    })
-  );
+  };
+  // Warm the implicit cache with one call, then fan out: concurrent requests
+  // cannot reuse a prefix that no finished request has written yet.
+  const first = config.intel.warmCacheFirst ? await ask(agents[0], 0) : undefined;
+  const rest = await Promise.all(agents.slice(config.intel.warmCacheFirst ? 1 : 0).map((a, j) => ask(a, j + (config.intel.warmCacheFirst ? 1 : 0))));
+  const answers = config.intel.warmCacheFirst ? [first, ...rest] : rest;
   const ok = answers.filter((x): x is NonNullable<typeof x> => Boolean(x) && Number.isFinite(x!.out.probYes));
   if (ok.length === 0) throw new Error('every forecaster failed');
 
