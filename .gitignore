@@ -1,0 +1,22 @@
+node_modules/
+.next/
+dist/
+out/
+*.tsbuildinfo
+.env
+.env.local
+.env.*.local
+!.env.example
+__pycache__/
+*.pyc
+.venv/
+.DS_Store
+spacetimedb/dist/
+coverage/
+# local seed folders created by onboarding (examples are committed explicitly)
+seeds/*
+!seeds/example-*/
+!seeds/README.md
+
+# engine identity token (local runs)
+.midas-engine-token
