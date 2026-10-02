@@ -11,6 +11,10 @@ better from every outcome.
 > [docs/RESEARCH.md](docs/RESEARCH.md)); MIDAS is built to find out honestly
 > whether an edge exists before risking capital.
 
+**2-minute explainer:** [`docs/explainer/`](docs/explainer/) — a motion
+graphic of the architecture, the target markets and a $500 × 6-month scenario
+model built on MIDAS's own sizing code.
+
 ## What it does
 
 1. **You bring money, markets and a seed folder.** Onboarding asks for a
